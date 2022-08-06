@@ -1,4 +1,4 @@
-import { Statement } from "../../entities/Statement";
+import { OperationType, Statement } from "../../entities/Statement";
 import { ICreateStatementDTO } from "../../useCases/createStatement/ICreateStatementDTO";
 import { IGetBalanceDTO } from "../../useCases/getBalance/IGetBalanceDTO";
 import { IGetStatementOperationDTO } from "../../useCases/getStatementOperation/IGetStatementOperationDTO";
@@ -7,10 +7,43 @@ import { IStatementsRepository } from "../IStatementsRepository";
 export class InMemoryStatementsRepository implements IStatementsRepository {
   private statements: Statement[] = [];
 
-  async create(data: ICreateStatementDTO): Promise<Statement> {
+  async create({
+    user_id,
+    amount,
+    description,
+    type,
+    sender_id
+  }: ICreateStatementDTO): Promise<Statement> {
     const statement = new Statement();
 
-    Object.assign(statement, data);
+    if (type === OperationType.TRANSFER) {
+      const sender = Object.assign(statement, {
+        user_id: sender_id,
+        amount,
+        description,
+        type
+      })
+
+      const receiver = Object.assign(statement, {
+        user_id,
+        sender_id,
+        amount,
+        description,
+        type
+      })
+
+      this.statements.push(sender);
+      this.statements.push(receiver);
+
+      return receiver
+    }
+
+    Object.assign(statement, {
+      user_id: sender_id,
+      amount,
+      description,
+      type
+    });
 
     this.statements.push(statement);
 
@@ -27,15 +60,19 @@ export class InMemoryStatementsRepository implements IStatementsRepository {
   async getUserBalance({ user_id, with_statement = false }: IGetBalanceDTO):
     Promise<
       { balance: number } | { balance: number, statement: Statement[] }
-    >
-  {
+    > {
     const statement = this.statements.filter(operation => operation.user_id === user_id);
 
     const balance = statement.reduce((acc, operation) => {
-      if (operation.type === 'deposit') {
-        return acc + operation.amount;
+      if (operation.type === OperationType.DEPOSIT) {
+        return acc + Number(operation.amount);
+      } else if (operation.type === OperationType.WITHDRAW) {
+        return acc - Number(operation.amount);
       } else {
-        return acc - operation.amount;
+        if (operation.sender_id) {
+          return acc + Number(operation.amount);
+        }
+        return acc - Number(operation.amount);
       }
     }, 0)
 

@@ -39,10 +39,11 @@ describe("Get balance", () => {
     });
 
     await createStatementUseCase.execute({
-      user_id: token.user.id,
+      sender_id: token.user.id,
       type: OperationType.DEPOSIT,
       amount: 200,
-      description: "Deposit $200"
+      description: "Deposit $200",
+      user_id: undefined
     })
 
     const result = await getBalanceUseCase.execute({
